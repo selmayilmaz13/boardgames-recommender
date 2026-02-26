@@ -4,28 +4,52 @@ from recommender import load_data, build_feature_table, compute_similarity, reco
 st.set_page_config(page_title="Board Game Recommender", layout="wide")
 
 @st.cache_data
+def load_uploaded_tables(up_games, up_mech, up_themes, up_sub):
+    import pandas as pd
+    games = pd.read_csv(up_games)
+    mechanics = pd.read_csv(up_mech)
+    themes = pd.read_csv(up_themes)
+    subcats = pd.read_csv(up_sub)
+
+    for df in (games, mechanics, themes, subcats):
+        df.columns = df.columns.str.strip().str.lower()
+
+    return games, mechanics, themes, subcats
+
+@st.cache_data
 def get_games_tables():
     return load_data()
 
 @st.cache_resource
-def get_model():
-    games, mech, themes, sub = get_games_tables()
+def get_model_from_tables(games, mech, themes, sub):
     feats, bggids, X = build_feature_table(mech, themes, sub)
     sim = compute_similarity(X)
     return games, bggids, sim, feats
 
-try:
-    games, bggids, sim, feats = get_model()
-except FileNotFoundError:
-    st.error("Dataset not found! Please download the board-games-database-from-boardgamegeek dataset from Kaggle and extract the CSV files into the `data/` folder.")
-    st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
-    st.stop()
-
 with st.sidebar:
+    st.header("Dataset setup")
+    up_games = st.file_uploader("Upload games.csv", type="csv")
+    up_mech = st.file_uploader("Upload mechanics.csv", type="csv")
+    up_themes = st.file_uploader("Upload themes.csv", type="csv")
+    up_sub = st.file_uploader("Upload subcategories.csv", type="csv")
+    st.divider()
+
     st.header("Data & Attribution")
     st.write("Dataset source: BoardGameGeek via Kaggle dataset [threnjen/board-games-database-from-boardgamegeek](https://www.kaggle.com/datasets/threnjen/board-games-database-from-boardgamegeek). Licensed under [Creative Commons Attribution-ShareAlike (CC BY-SA)](https://creativecommons.org/licenses/by-sa/4.0/).")
     st.write("Dataset was cleaned and preprocessed for recommendation purposes.")
     st.write("Powered by [BoardGameGeek](https://boardgamegeek.com).")
+
+if up_games and up_mech and up_themes and up_sub:
+    g_df, m_df, t_df, s_df = load_uploaded_tables(up_games, up_mech, up_themes, up_sub)
+    games, bggids, sim, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
+else:
+    try:
+        g_df, m_df, t_df, s_df = get_games_tables()
+        games, bggids, sim, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
+    except FileNotFoundError:
+        st.error("Dataset not found! Please download the board-games-database-from-boardgamegeek dataset from Kaggle and upload the CSV files in the sidebar, or extract them into a `data/` folder locally.")
+        st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
+        st.stop()
 
 st.title("🎲 Board Game Recommender (Cosine Similarity)")
 st.caption("Content-based recommender using cosine similarity over mechanics, themes, and subcategories. Explanations ranked by IDF importance.")
