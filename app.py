@@ -125,7 +125,7 @@ with tab1:
 
             # Reorder columns slightly for better view
             cols = ["name", "similarity", "Bayes Avg Rating", "# User Ratings", "Why Recommended"]
-            st.dataframe(recs[cols], use_container_width=True)
+            st.dataframe(recs[cols], width="stretch")
 
 with tab2:
     pop_top_k = st.slider("Top K", min_value=5, max_value=30, value=10)
@@ -139,9 +139,9 @@ with tab2:
         "numuserratings": "# User Ratings",
         "yearpublished": "Year Published"
     })
-    st.dataframe(pop_df, use_container_width=True)
+    st.dataframe(pop_df, width="stretch")
 
 with st.expander("Dataset summary"):
     st.write(f"Games: {len(games):,}")
     st.write(f"Feature table rows: {len(feats):,} | Features: {feats.shape[1]-1:,}")
-    st.dataframe(games.head(10), use_container_width=True)
+    st.dataframe(games.head(10), width="stretch")
