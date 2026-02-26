@@ -14,7 +14,18 @@ def get_model():
     sim = compute_similarity(X)
     return games, bggids, sim, feats
 
-games, bggids, sim, feats = get_model()
+try:
+    games, bggids, sim, feats = get_model()
+except FileNotFoundError:
+    st.error("Dataset not found! Please download the board-games-database-from-boardgamegeek dataset from Kaggle and extract the CSV files into the `data/` folder.")
+    st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
+    st.stop()
+
+with st.sidebar:
+    st.header("Data & Attribution")
+    st.write("Dataset source: BoardGameGeek via Kaggle dataset [threnjen/board-games-database-from-boardgamegeek](https://www.kaggle.com/datasets/threnjen/board-games-database-from-boardgamegeek). Licensed under [Creative Commons Attribution-ShareAlike (CC BY-SA)](https://creativecommons.org/licenses/by-sa/4.0/).")
+    st.write("Dataset was cleaned and preprocessed for recommendation purposes.")
+    st.write("Powered by [BoardGameGeek](https://boardgamegeek.com).")
 
 st.title("🎲 Board Game Recommender (Cosine Similarity)")
 st.caption("Content-based recommender using cosine similarity over mechanics, themes, and subcategories. Explanations ranked by IDF importance.")
