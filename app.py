@@ -77,7 +77,7 @@ else:
     st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
     st.stop()
 
-st.title("🎲 Board Game Recommender (Cosine Similarity)")
+st.title("🎲 Board Game Recommender")
 st.caption("Content-based recommender using cosine similarity over mechanics, themes, and subcategories. Explanations ranked by IDF importance.")
 st.write("Select a game and get similar recommendations based on mechanics, themes, and subcategories.")
 
