@@ -5,17 +5,8 @@ from recommender import load_data, build_feature_table, compute_similarity, reco
 st.set_page_config(page_title="Board Game Recommender", layout="wide")
 
 @st.cache_data
-def load_uploaded_tables(up_games, up_mech, up_themes, up_sub):
-    import pandas as pd
-    games = pd.read_csv(up_games)
-    mechanics = pd.read_csv(up_mech)
-    themes = pd.read_csv(up_themes)
-    subcats = pd.read_csv(up_sub)
-
-    for df in (games, mechanics, themes, subcats):
-        df.columns = df.columns.str.strip().str.lower()
-
-    return games, mechanics, themes, subcats
+def get_games_tables():
+    return load_data()
 
 @st.cache_data
 def get_games_tables():
@@ -38,26 +29,12 @@ except Exception:
     local_data_valid = False
 
 with st.sidebar:
-    st.header("Dataset setup")
-    
-    use_uploads = False
-    up_games = None
-    up_mech = None
-    up_themes = None
-    up_sub = None
+    st.header("Dataset")
     
     if local_data_valid:
-        st.success("Dataset loaded successfully (bundled version).")
+        st.success("Bundled dataset loaded successfully (21K+ games, 1.17M interactions).")
     else:
-        up_games = st.file_uploader("Upload games.csv", type="csv")
-        up_mech = st.file_uploader("Upload mechanics.csv", type="csv")
-        up_themes = st.file_uploader("Upload themes.csv", type="csv")
-        up_sub = st.file_uploader("Upload subcategories.csv", type="csv")
-        
-        use_uploads = bool(up_games and up_mech and up_themes and up_sub)
-        
-        if use_uploads:
-            st.info("Using uploaded dataset.")
+        st.error("Bundled dataset missing. Make sure to place `games.csv`, `mechanics.csv`, `themes.csv`, and `subcategories.csv` inside `/data`.")
         
     st.divider()
 
@@ -66,15 +43,10 @@ with st.sidebar:
     st.write("Dataset was cleaned and preprocessed for recommendation purposes.")
     st.write("Powered by [BoardGameGeek](https://boardgamegeek.com).")
 
-if use_uploads:
-    g_df, m_df, t_df, s_df = load_uploaded_tables(up_games, up_mech, up_themes, up_sub)
-    games, bggids, nn_model, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
-elif local_data_valid:
+if local_data_valid:
     g_df, m_df, t_df, s_df = get_games_tables()
     games, bggids, nn_model, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
 else:
-    st.error("Dataset not found! Please download the board-games-database-from-boardgamegeek dataset from Kaggle and upload the CSV files in the sidebar, or extract them into a `data/` folder locally.")
-    st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
     st.stop()
 
 st.title("🎲 Board Game Recommender")
