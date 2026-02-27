@@ -24,8 +24,8 @@ def get_games_tables():
 @st.cache_resource
 def get_model_from_tables(games, mech, themes, sub):
     feats, bggids, X = build_feature_table(mech, themes, sub)
-    sim = compute_similarity(X)
-    return games, bggids, sim, feats
+    nn_model = compute_similarity(X)
+    return games, bggids, nn_model, feats
 
 with st.sidebar:
     st.header("Dataset setup")
@@ -51,11 +51,11 @@ with st.sidebar:
 
 if use_uploads:
     g_df, m_df, t_df, s_df = load_uploaded_tables(up_games, up_mech, up_themes, up_sub)
-    games, bggids, sim, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
+    games, bggids, nn_model, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
 else:
     try:
         g_df, m_df, t_df, s_df = get_games_tables()
-        games, bggids, sim, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
+        games, bggids, nn_model, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
     except FileNotFoundError:
         st.error("Dataset not found! Please download the board-games-database-from-boardgamegeek dataset from Kaggle and upload the CSV files in the sidebar, or extract them into a `data/` folder locally.")
         st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
@@ -115,7 +115,8 @@ with tab1:
             selected_game,
             games,
             bggids,
-            sim,
+            nn_model,
+            feats,
             top_n=top_n,
             min_user_ratings=min_ratings,
             required_categories=selected_categories,

@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.neighbors import NearestNeighbors
 
 DATA_DIR = "data"
 
@@ -34,14 +35,16 @@ def build_feature_table(mechanics, themes, subcats):
 
 
 def compute_similarity(X):
-    return cosine_similarity(X)
+    nn = NearestNeighbors(metric="cosine", algorithm="brute")
+    nn.fit(X)
+    return nn
 
 
-def recommend(game_name, games, bggids, sim, top_n=10, min_user_ratings=200, required_categories=None, diversity_lambda=1.0):
+def recommend(game_name, games, bggids, nn_model, feats, top_n=10, min_user_ratings=200, required_categories=None, diversity_lambda=1.0):
     if required_categories is None:
         required_categories = []
     """
-    Recommend similar games based on cosine similarity.
+    Recommend similar games based on cosine similarity logic without a full matrix.
     Filters out games with very few ratings.
     """
     match = games[games["name"].astype(str).str.lower() == game_name.lower()]
@@ -54,15 +57,26 @@ def recommend(game_name, games, bggids, sim, top_n=10, min_user_ratings=200, req
         return pd.DataFrame()
 
     idx = idx_arr[0]
-    scores = sim[idx].copy()
-    scores[idx] = -1  # exclude itself
+    
+    # Get feature vector for target
+    target_vec = feats[feats["bggid"] == target_id].drop(columns=["bggid"]).to_numpy(dtype=float)
 
-    # take more than top_n first, then filter by min_user_ratings
+    # Query nn_model
     candidate_multiplier = 50
-    top_idx = np.argsort(scores)[::-1][: top_n * candidate_multiplier]
-
-    rec_ids = bggids[top_idx]
-    rec_scores = scores[top_idx]
+    n_neighbors_to_query = min(top_n * candidate_multiplier, len(bggids))
+    distances, indices = nn_model.kneighbors(target_vec, n_neighbors=n_neighbors_to_query)
+    
+    # Flatten arrays
+    distances = distances[0]
+    indices = indices[0]
+    
+    # Exclude the target itself from the results
+    mask = indices != idx
+    indices = indices[mask]
+    distances = distances[mask]
+    
+    rec_scores = 1.0 - distances
+    rec_ids = bggids[indices]
 
     results = games[games["bggid"].isin(rec_ids)].copy()
 
@@ -82,29 +96,31 @@ def recommend(game_name, games, bggids, sim, top_n=10, min_user_ratings=200, req
     # Apply MMR (Maximal Marginal Relevance) before returning
     # We want to iteratively pick up to top_n candidates
     if not results.empty and top_n > 0:
-        candidate_bool = bggids.reshape(-1, 1) == results["bggid"].to_numpy() # shape: (len(bggids), len(results))
-        candidate_indices = np.where(candidate_bool.any(axis=1))[0]
+        candidate_bggids = results["bggid"].tolist()
         
-        # Build mapping from bggid to sim index
-        bggid_to_idx = {bggids[i]: i for i in candidate_indices}
+        cand_feats_df = feats.set_index("bggid").loc[candidate_bggids]
+        cand_vecs = cand_feats_df.to_numpy(dtype=float)
+        cand_to_idx = {cand: i for i, cand in enumerate(candidate_bggids)}
         
         selected_bggids = []
-        candidate_bggids = results["bggid"].tolist()
+        selected_indices = []
         
         while len(selected_bggids) < top_n and candidate_bggids:
             best_score = -np.inf
             best_cand = None
+            best_cand_idx = None
             
             for cand in candidate_bggids:
-                cand_idx = bggid_to_idx[cand]
-                sim_to_query = sim[idx, cand_idx]
+                cand_idx = cand_to_idx[cand]
+                sim_to_query = score_map.get(int(cand), 0.0)
                 
                 if not selected_bggids:
                     score = sim_to_query
                 else:
-                    # Max sim between this candidate and any already selected candidate
-                    selected_indices = [bggid_to_idx[s] for s in selected_bggids]
-                    max_sim_to_selected = np.max(sim[cand_idx, selected_indices])
+                    cand_vec = cand_vecs[cand_idx:cand_idx+1]
+                    sel_vecs = cand_vecs[selected_indices]
+                    sims = cosine_similarity(cand_vec, sel_vecs)
+                    max_sim_to_selected = np.max(sims)
                     
                     # MMR formula
                     score = (diversity_lambda * sim_to_query) - ((1.0 - diversity_lambda) * max_sim_to_selected)
@@ -112,8 +128,10 @@ def recommend(game_name, games, bggids, sim, top_n=10, min_user_ratings=200, req
                 if score > best_score:
                     best_score = score
                     best_cand = cand
+                    best_cand_idx = cand_idx
             
             selected_bggids.append(best_cand)
+            selected_indices.append(best_cand_idx)
             candidate_bggids.remove(best_cand)
             
         # Re-sort results DataFrame based on MMR selection order
