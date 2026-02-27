@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 from recommender import load_data, build_feature_table, compute_similarity, recommend, explain_recommendations
 
 st.set_page_config(page_title="Board Game Recommender", layout="wide")
@@ -32,6 +33,15 @@ with st.sidebar:
     up_mech = st.file_uploader("Upload mechanics.csv", type="csv")
     up_themes = st.file_uploader("Upload themes.csv", type="csv")
     up_sub = st.file_uploader("Upload subcategories.csv", type="csv")
+    
+    use_uploads = bool(up_games and up_mech and up_themes and up_sub)
+    local_data_exists = all(os.path.exists(f) for f in ["data/games.csv", "data/mechanics.csv", "data/themes.csv", "data/subcategories.csv"])
+    
+    if use_uploads:
+        st.info("Using uploaded dataset.")
+    elif local_data_exists:
+        st.info("Using bundled dataset from /data directory.")
+        
     st.divider()
 
     st.header("Data & Attribution")
@@ -39,7 +49,7 @@ with st.sidebar:
     st.write("Dataset was cleaned and preprocessed for recommendation purposes.")
     st.write("Powered by [BoardGameGeek](https://boardgamegeek.com).")
 
-if up_games and up_mech and up_themes and up_sub:
+if use_uploads:
     g_df, m_df, t_df, s_df = load_uploaded_tables(up_games, up_mech, up_themes, up_sub)
     games, bggids, sim, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
 else:
