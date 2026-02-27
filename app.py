@@ -27,20 +27,37 @@ def get_model_from_tables(games, mech, themes, sub):
     nn_model = compute_similarity(X)
     return games, bggids, nn_model, feats
 
+local_data_valid = False
+try:
+    local_data_exists = all(os.path.exists(f) for f in ["data/games.csv", "data/mechanics.csv", "data/themes.csv", "data/subcategories.csv"])
+    if local_data_exists:
+        # Pre-load to verify it's valid
+        get_games_tables()
+        local_data_valid = True
+except Exception:
+    local_data_valid = False
+
 with st.sidebar:
     st.header("Dataset setup")
-    up_games = st.file_uploader("Upload games.csv", type="csv")
-    up_mech = st.file_uploader("Upload mechanics.csv", type="csv")
-    up_themes = st.file_uploader("Upload themes.csv", type="csv")
-    up_sub = st.file_uploader("Upload subcategories.csv", type="csv")
     
-    use_uploads = bool(up_games and up_mech and up_themes and up_sub)
-    local_data_exists = all(os.path.exists(f) for f in ["data/games.csv", "data/mechanics.csv", "data/themes.csv", "data/subcategories.csv"])
+    use_uploads = False
+    up_games = None
+    up_mech = None
+    up_themes = None
+    up_sub = None
     
-    if use_uploads:
-        st.info("Using uploaded dataset.")
-    elif local_data_exists:
-        st.info("Using bundled dataset from /data directory.")
+    if local_data_valid:
+        st.success("Dataset loaded successfully (bundled version).")
+    else:
+        up_games = st.file_uploader("Upload games.csv", type="csv")
+        up_mech = st.file_uploader("Upload mechanics.csv", type="csv")
+        up_themes = st.file_uploader("Upload themes.csv", type="csv")
+        up_sub = st.file_uploader("Upload subcategories.csv", type="csv")
+        
+        use_uploads = bool(up_games and up_mech and up_themes and up_sub)
+        
+        if use_uploads:
+            st.info("Using uploaded dataset.")
         
     st.divider()
 
@@ -52,14 +69,13 @@ with st.sidebar:
 if use_uploads:
     g_df, m_df, t_df, s_df = load_uploaded_tables(up_games, up_mech, up_themes, up_sub)
     games, bggids, nn_model, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
+elif local_data_valid:
+    g_df, m_df, t_df, s_df = get_games_tables()
+    games, bggids, nn_model, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
 else:
-    try:
-        g_df, m_df, t_df, s_df = get_games_tables()
-        games, bggids, nn_model, feats = get_model_from_tables(g_df, m_df, t_df, s_df)
-    except FileNotFoundError:
-        st.error("Dataset not found! Please download the board-games-database-from-boardgamegeek dataset from Kaggle and upload the CSV files in the sidebar, or extract them into a `data/` folder locally.")
-        st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
-        st.stop()
+    st.error("Dataset not found! Please download the board-games-database-from-boardgamegeek dataset from Kaggle and upload the CSV files in the sidebar, or extract them into a `data/` folder locally.")
+    st.info("Required files: `games.csv`, `mechanics.csv`, `themes.csv`, `subcategories.csv`")
+    st.stop()
 
 st.title("🎲 Board Game Recommender (Cosine Similarity)")
 st.caption("Content-based recommender using cosine similarity over mechanics, themes, and subcategories. Explanations ranked by IDF importance.")
